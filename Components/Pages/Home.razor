@@ -1,4 +1,13 @@
 ﻿@page "/"
+@using Microsoft.EntityFrameworkCore
+@using be.Models
+@using be.Data
+@using be.Services
+@using System.Text.Json;
+@using System.Security.Claims
+@implements IAsyncDisposable
+@inject IDbContextFactory<be.Data.BeDataContext> DbFactory
+@inject AuthenticationStateProvider CurrentlyAuthenticated
 
 <style>
     .hidden {
@@ -45,7 +54,9 @@
     }
 </style>
 
-<template id="fe-model"></template>
+<template id="fe-model">
+    @JsonSerializer.Serialize(user)
+</template>
 
 <div id="fe-game-root">
     <div class="loading-box">
@@ -54,3 +65,30 @@
     </div>
 </div>
 <script type="module" src="index.js"></script>
+
+@code {
+    private BeDataContext context = default!;
+    User? user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await CurrentlyAuthenticated.GetAuthenticationStateAsync();
+        var claims = authState.User;
+
+        if (claims.Identity is not null && claims.Identity.IsAuthenticated)
+        {
+            int id;
+            int.TryParse(claims.FindFirst(c => c.Type == "Id")?.Value, out id);
+            var possible = context.User.SingleOrDefault(u => u.Id == id);
+
+            user = possible ?? new User { Id = 0, Name = "Guest" };
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}
