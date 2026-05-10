@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using be.Components;
 using be.Data;
 using be.Endpoints;
@@ -5,9 +6,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-var connectionString = builder.Configuration.GetConnectionString("BeDataContext") ?? throw new InvalidOperationException("Connection string 'BeDataContext' not found.");
+var channel = Channel.CreateUnbounded<GameEvent>();
 
-builder.Services.AddDbContextFactory<BeDataContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddSingleton(channel.Reader);
+builder.Services.AddDbContextFactory<BeDataContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("BeDataContext")));
 builder.Services.AddRazorComponents();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
 {
@@ -32,5 +34,6 @@ app.UseAuthorization();
 app.MapRazorComponents<App>();
 
 app.MapPost("user/create", User.Create);
+app.MapGet("game/events", Game.Events);
 
 app.Run();
